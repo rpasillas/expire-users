@@ -135,8 +135,14 @@ class Expire_User {
 	 * Expire
 	 */
 	function expire() {
-		update_user_meta( $this->user_id, '_expire_user_expired', 'Y' );
-		do_action( 'expire_users_expired', $this );
+		$user = get_userdata( $this->user_id );
+//		error_log( print_r( ['ron_user_debug'=>$user], true) );
+
+		//only expire Invited Guest Role
+		if( in_array('invited_guest', $user->roles ) ){
+			update_user_meta( $this->user_id, '_expire_user_expired', 'Y' );
+			do_action( 'expire_users_expired', $this );
+		}
 	}
 
 	/**

@@ -10,11 +10,12 @@ class Expire_Users {
 	public function __construct() {
 		$this->cron = new Expire_Users_Cron();
 		$this->admin = new Expire_User_Admin();
-		add_filter( 'authenticate', array( $this, 'authenticate' ), 10, 3 );
+		add_filter( 'wp_authenticate_user', array( $this, 'authenticate' ), 10, 2 );
 		add_filter( 'allow_password_reset', array( $this, 'allow_password_reset' ), 10, 2 );
 		add_filter( 'shake_error_codes', array( $this, 'shake_error_codes' ) );
 		add_action( 'register_form', array( $this, 'register_form' ) );
 		add_action( 'user_register', array( $this, 'user_register' ) );
+		add_action( 'gform_user_registered', array( $this, 'user_register_gform'), 10, 4 );
 		add_action( 'expire_users_expired', array( $this, 'handle_on_expire_default_to_role' ) );
 		add_action( 'expire_users_expired', array( $this, 'handle_on_expire_user_reset_password' ) );
 		add_action( 'expire_users_expired', array( $this, 'handle_on_expire_user_email' ) );
@@ -38,30 +39,47 @@ class Expire_Users {
 	}
 
 	/**
-	 * User Register
-	 * Runs on user registration.
+	 * Runs on native WP user registration.
 	 */
 	function user_register( $user_id ) {
 		if ( isset( $_POST['expire_users'] ) && 'auto' == $_POST['expire_users'] ) {
-
-			$expire_settings = $this->admin->settings->get_default_expire_settings();
-
-			$expire_data = array(
-				'expire_user_date_type'         => $expire_settings['expire_user_date_type'],
-				'expire_user_date_in_num'       => $expire_settings['expire_user_date_in_num'],
-				'expire_user_date_in_block'     => $expire_settings['expire_user_date_in_block'],
-				'expire_user_date_on_timestamp' => $expire_settings['expire_timestamp'],
-				'expire_user_role'              => $expire_settings['expire_user_role'],
-				'expire_user_reset_password'    => $expire_settings['expire_user_reset_password'],
-				'expire_user_email'             => $expire_settings['expire_user_email'],
-				'expire_user_email_admin'       => $expire_settings['expire_user_email_admin'],
-				'expire_user_remove_expiry'     => $expire_settings['expire_user_remove_expiry']
-			);
-
-			$user = new Expire_User( $user_id );
-			$user->set_expire_data( $expire_data );
-			$user->save_user();
+			$this->do_register_user( $user_id );
 		}
+	}
+
+
+	/**
+	 * Runs on user registration via the Gravity Forms User Registration Add-on
+	 * @param $user_id
+	 */
+	function user_register_gform( $user_id, $feed, $entry ) {
+		//maybe we want to do some checking if the user that registered?
+		//for now just register them with all the expiration goodies
+		$this->do_register_user( $user_id );
+
+	}
+
+	/**
+	 * User Register with Expiration goodies
+	 */
+	public function do_register_user( $user_id ){
+		$expire_settings = $this->admin->settings->get_default_expire_settings();
+
+		$expire_data = array(
+			'expire_user_date_type'         => $expire_settings['expire_user_date_type'],
+			'expire_user_date_in_num'       => $expire_settings['expire_user_date_in_num'],
+			'expire_user_date_in_block'     => $expire_settings['expire_user_date_in_block'],
+			'expire_user_date_on_timestamp' => $expire_settings['expire_timestamp'],
+			'expire_user_role'              => $expire_settings['expire_user_role'],
+			'expire_user_reset_password'    => $expire_settings['expire_user_reset_password'],
+			'expire_user_email'             => $expire_settings['expire_user_email'],
+			'expire_user_email_admin'       => $expire_settings['expire_user_email_admin'],
+			'expire_user_remove_expiry'     => $expire_settings['expire_user_remove_expiry']
+		);
+
+		$user = new Expire_User( $user_id );
+		$user->set_expire_data( $expire_data );
+		$user->save_user();
 	}
 
 	/**
@@ -183,16 +201,17 @@ class Expire_Users {
 	/**
 	 * Authenticate
 	 */
-	function authenticate( $user, $username, $password ) {
-		$checkuser = get_user_by( 'login', $username );
-		if ( $checkuser ) {
-			$u = new Expire_User( $checkuser->ID );
+	function authenticate( $user, $password ) {
+		if ( !is_wp_error( $user ) ) {
+			$u = new Expire_User( $user->ID );
 			$expired = $u->is_expired();
+
 			if ( ! $expired ) {
 				$expired = $u->maybe_expire();
 			}
+
 			if ( $expired ) {
-				remove_action( 'authenticate', 'wp_authenticate_username_password', 20 );
+				remove_action( 'authenticate', 'wp_authenticate_username_password', 40 );
 				return new WP_Error( 'expire_users_expired', sprintf( '<strong>%s</strong> %s', __( 'ERROR:' ), __( 'Your user details have expired.', 'expire-users' ) ) );
 			}
 		}
