@@ -136,7 +136,6 @@ class Expire_User {
 	 */
 	function expire() {
 		$user = get_userdata( $this->user_id );
-//		error_log( print_r( ['ron_user_debug'=>$user], true) );
 
 		//only expire Invited Guest Role
 		if( in_array('invited_guest', $user->roles ) ){
