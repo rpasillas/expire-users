@@ -212,7 +212,7 @@ class Expire_Users {
 
 			if ( $expired ) {
 				remove_action( 'authenticate', 'wp_authenticate_username_password', 40 );
-				return new WP_Error( 'expire_users_expired', sprintf( '<strong>%s</strong> %s', __( 'ERROR:' ), __( 'Your user details have expired.', 'expire-users' ) ) );
+				return new WP_Error( 'expire_users_expired', sprintf( '<strong>%s</strong> %s', __( 'ERROR:' ), __( "We're sorry, your account is no longer active.", 'expire-users' ) ) );
 			}
 		}
 		return $user;
